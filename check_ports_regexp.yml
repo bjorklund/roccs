@@ -14,7 +14,7 @@
     - name: Get data
       #shell: netstat -tulpan |grep -E "tcp|udp" | awk {'print $1 " " $4'} |sed 's/ .*:/ /' |sort | uniq
       shell: netstat -tulpan |grep -E "tcp|udp"
-      register: date_data
+      register: netstat_data
     - name: Stor data
       lineinfile:
         insertafter: EOF
@@ -23,13 +23,13 @@
         line: "========= {{ ansible_facts['distribution'] }} == {{ inventory_hostname }} ========"
       delegate_to: localhost
     - set_fact:
-        ipv4: "{{ date_data.stdout | regex_findall('^tcp\\s+.*:(\\d+).*:.*LISTEN', multiline=True)  }}"
+        ipv4: "{{ netstat_data.stdout | regex_findall('^tcp\\s+.*:(\\d+).*:.*LISTEN', multiline=True)  }}"
     - set_fact:
-        ipv6: "{{ date_data.stdout | regex_findall('^tcp6\\s+.*:(\\d+).*:.*LISTEN', multiline=True)  }}"
+        ipv6: "{{ netstat_data.stdout | regex_findall('^tcp6\\s+.*:(\\d+).*:.*LISTEN', multiline=True)  }}"
     - set_fact:
-        ipv4_udp: "{{ date_data.stdout | regex_findall('^udp\\s+.*:(\\d+).*:', multiline=True)  }}"
+        ipv4_udp: "{{ netstat_data.stdout | regex_findall('^udp\\s+.*:(\\d+).*:', multiline=True)  }}"
     - set_fact:
-        ipv6_udp: "{{ date_data.stdout | regex_findall('^udp6\\s+.*:(\\d+).*:', multiline=True)  }}"
+        ipv6_udp: "{{ netstat_data.stdout | regex_findall('^udp6\\s+.*:(\\d+).*:', multiline=True)  }}"
 
     #- debug:
     #    var: ipv4_udp
@@ -156,4 +156,3 @@
   tasks:
     - name: Get data
       shell: /root/iptbales-ipv4.sh ; /root/iptbales-ipv6.sh
-      register: date_data
