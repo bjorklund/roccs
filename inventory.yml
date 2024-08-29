@@ -1,0 +1,33 @@
+---
+all:
+  vars:
+    ansible_user: debian
+    #remote_user: debian
+  children:
+    zone1:
+      children:
+        z1_web:
+          hosts:
+            z1-webserver01:
+              ansible_host: 192.168.90.231
+            z1-webserver02:
+              ansible_host: 192.168.90.232
+        z1_db:
+          hosts:
+            z1-db01:
+              ansible_host: 192.168.90.233
+    zone2:
+      children:
+        z2_web:
+          hosts:
+            z2-webserver01:
+              ansible_host: 192.168.90.241
+              ansible_user: centos
+            z2-webserver02:
+              ansible_host: 192.168.90.242
+              ansible_user: centos
+        z2_db:
+          hosts:
+            z2-db01:
+              ansible_host: 192.168.90.243
+              ansible_user: centos

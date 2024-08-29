@@ -1,0 +1,150 @@
+---
+- name: Delete file
+  hosts: localhost
+  tasks:
+    - name: Delete file
+      ansible.builtin.file:
+        state: absent
+        path: servers-ports
+      delegate_to: localhost
+
+- name: Retrieve ports
+  hosts: all
+  tasks:
+    - name: Get data
+      #shell: netstat -tulpan |grep -E "tcp|udp" | awk {'print $1 " " $4'} |sed 's/ .*:/ /' |sort | uniq
+      shell: netstat -tulpan |grep -E "tcp|udp"
+      register: date_data
+    - name: Stor data
+      lineinfile:
+        insertafter: EOF
+        create: true
+        path: servers-ports
+        line: "========= {{ ansible_facts['distribution'] }} == {{ inventory_hostname }} ========"
+      delegate_to: localhost
+    - set_fact:
+        ipv4: "{{ date_data.stdout | regex_findall('^tcp\\s+.*:(\\d+).*:.*LISTEN', multiline=True)  }}"
+    - set_fact:
+        ipv6: "{{ date_data.stdout | regex_findall('^tcp6\\s+.*:(\\d+).*:.*LISTEN', multiline=True)  }}"
+    - set_fact:
+        ipv4_udp: "{{ date_data.stdout | regex_findall('^udp\\s+.*:(\\d+).*:', multiline=True)  }}"
+    - set_fact:
+        ipv6_udp: "{{ date_data.stdout | regex_findall('^udp6\\s+.*:(\\d+).*:', multiline=True)  }}"
+
+    #- debug:
+    #    var: ipv4_udp
+    #- name: loop ipv4_udp
+    #  ansible.builtin.debug:
+    #    msg: "iptables -A INPUT -i {{ ansible_default_ipv4.interface }} -p TCP --dport {{ item }} -j ACCEPT"
+    #  with_items: "{{ ipv4_udp }}"
+    #- name: loop ipv6
+    #  ansible.builtin.debug:
+    #    msg: "iptables6 -A INPUT -i {{ ansible_default_ipv4.interface }} -p TCP --dport {{ item }} -j ACCEPT"
+    #  with_items: "{{ ipv6 }}"
+    #- meta: end_play
+
+    - name: Delete file
+      become: true
+      become_user: root
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "/root/iptbales-ipv4.sh"
+        - "/root/iptbales-ipv6.sh"
+
+    - name: Stor iptables ipv4
+      become: true
+      become_user: root
+      lineinfile:
+        create: true
+        mode: 0755
+        dest: /root/iptbales-ipv4.sh
+        line: "{{ item }}"
+      with_items:
+        - "#!/bin/sh"
+        - "iptables -F"
+        - "iptables -A OUTPUT -o {{ ansible_default_ipv4.interface }} -m state --state ESTABLISHED,RELATED -j ACCEPT"
+        - "iptables -A INPUT -i {{ ansible_default_ipv4.interface }} -m state --state ESTABLISHED,RELATED -j ACCEPT"
+        - "iptables -A INPUT -i {{ ansible_default_ipv4.interface }} -p icmp --icmp-type any -j ACCEPT"
+
+    - name: Stor iptables ipv4 tcp
+      become: true
+      become_user: root
+      lineinfile:
+        create: true
+        insertafter: EOF
+        path: /root/iptbales-ipv4.sh
+        line: "iptables -A INPUT -i {{ ansible_default_ipv4.interface }} -p TCP --dport {{ item }} -j ACCEPT"
+      with_items: "{{ ipv4 }}"
+
+    - name: Stor iptables ipv4 udp
+      become: true
+      become_user: root
+      lineinfile:
+        insertafter: EOF
+        path: /root/iptbales-ipv4.sh
+        line: "iptables -A INPUT -i {{ ansible_default_ipv4.interface }} -p UDP --dport {{ item }} -j ACCEPT"
+      with_items: "{{ ipv4_udp }}"
+
+    - name: Stor iptables ipv6
+      become: true
+      become_user: root
+      lineinfile:
+        mode: 0755
+        dest: /root/iptbales-ipv4.sh
+        line: "{{ item }}"
+      with_items:
+        - "iptables -A OUTPUT -o {{ ansible_default_ipv4.interface }} -j LOG"
+        - "iptables -A OUTPUT -o {{ ansible_default_ipv4.interface }} -j DROP"
+        - "iptables -A INPUT -i {{ ansible_default_ipv4.interface }} -j LOG"
+        - "iptables -A INPUT -i {{ ansible_default_ipv4.interface }} -j DROP"
+
+    - name: Stor iptables ipv6
+      become: true
+      become_user: root
+      lineinfile:
+        create: true
+        mode: 0755
+        dest: /root/iptbales-ipv6.sh
+        line: "{{ item }}"
+      with_items:
+        - "#!/bin/sh"
+        - "ip6tables -F"
+        - "ip6tables -A OUTPUT -o {{ ansible_default_ipv4.interface }} -m state --state ESTABLISHED,RELATED -j ACCEPT"
+        - "ip6tables -A INPUT -i {{ ansible_default_ipv4.interface }} -m state --state ESTABLISHED,RELATED -j ACCEPT"
+        - "ip6tables -A INPUT -i {{ ansible_default_ipv4.interface }} -p ipv6-icmp  -j ACCEPT"
+
+    - name: Stor iptables ipv6
+      become: true
+      become_user: root
+      lineinfile:
+        create: true
+        mode: 0755
+        insertafter: EOF
+        path: /root/iptbales-ipv6.sh
+        line: "ip6tables -A INPUT -i {{ ansible_default_ipv4.interface }} -p TCP --dport {{ item }} -j ACCEPT"
+      with_items: "{{ ipv6 }}"
+
+    - name: Stor iptables ipv6 udp
+      become: true
+      become_user: root
+      lineinfile:
+        mode: 0755
+        insertafter: EOF
+        path: /root/iptbales-ipv6.sh
+        line: "ip6tables -A INPUT -i {{ ansible_default_ipv4.interface }} -p UDP --dport {{ item }} -j ACCEPT"
+      with_items: "{{ ipv6_udp }}"
+
+    - name: Stor iptables ipv6
+      become: true
+      become_user: root
+      lineinfile:
+        mode: 0755
+        dest: /root/iptbales-ipv6.sh
+        line: "{{ item }}"
+      with_items:
+        - "ip6tables -A OUTPUT -o {{ ansible_default_ipv4.interface }} -j LOG"
+        - "ip6tables -A OUTPUT -o {{ ansible_default_ipv4.interface }} -j DROP"
+        - "ip6tables -A INPUT -i {{ ansible_default_ipv4.interface }} -j LOG"
+        - "ip6tables -A INPUT -i {{ ansible_default_ipv4.interface }} -j DROP"
